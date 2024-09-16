@@ -4,15 +4,12 @@ stages:
   - build
   - test
   - publish
-  - optional_deploy
 
 # Etapa de Checkout do código
 checkout:
   stage: checkout
   script:
     - echo "Clonando repositório"
-  tags:
-    - docker
   only:
     - master
 
@@ -23,8 +20,6 @@ setup_environment:
   script:
     - echo "Configurando ambiente .NET"
     - dotnet --version
-  tags:
-    - docker
   only:
     - master
 
@@ -37,8 +32,6 @@ build_project:
     - dotnet restore
     - echo "Buildando o projeto"
     - dotnet build --no-restore --configuration Release
-  tags:
-    - docker
   only:
     - master
 
@@ -49,8 +42,6 @@ run_tests:
   script:
     - echo "Executando testes"
     - dotnet test --no-restore --verbosity normal
-  tags:
-    - docker
   only:
     - master
 
@@ -65,23 +56,5 @@ publish_artifacts:
   artifacts:
     paths:
       - ./output
-  tags:
-    - docker
-  only:
-    - master
-
-# Etapa opcional: Deploy com Docker
-optional_deploy:
-  stage: optional_deploy
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - echo "Criando imagem Docker"
-    - docker build -t jellyfin:latest .
-    - echo "Deploy da imagem"
-    - docker push your-repo/jellyfin:latest
-  tags:
-    - docker
   only:
     - master
