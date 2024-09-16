@@ -9,6 +9,17 @@ on:
       - main
 
 jobs:
+
+  checkout_code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: true
+          lfs: true
+
   setup_environment:
     runs-on: ubuntu-latest
     steps:
