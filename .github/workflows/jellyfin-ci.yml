@@ -1,0 +1,87 @@
+stages:
+  - checkout
+  - setup
+  - build
+  - test
+  - publish
+  - optional_deploy
+
+# Etapa de Checkout do código
+checkout:
+  stage: checkout
+  script:
+    - echo "Clonando repositório"
+  tags:
+    - docker
+  only:
+    - master
+
+# Etapa de Setup do Ambiente (.NET Core)
+setup_environment:
+  stage: setup
+  image: mcr.microsoft.com/dotnet/core/sdk:5.0
+  script:
+    - echo "Configurando ambiente .NET"
+    - dotnet --version
+  tags:
+    - docker
+  only:
+    - master
+
+# Etapa de Build do Projeto
+build_project:
+  stage: build
+  image: mcr.microsoft.com/dotnet/core/sdk:5.0
+  script:
+    - echo "Restaurando dependências"
+    - dotnet restore
+    - echo "Buildando o projeto"
+    - dotnet build --no-restore --configuration Release
+  tags:
+    - docker
+  only:
+    - master
+
+# Etapa de Testes Automatizados
+run_tests:
+  stage: test
+  image: mcr.microsoft.com/dotnet/core/sdk:5.0
+  script:
+    - echo "Executando testes"
+    - dotnet test --no-restore --verbosity normal
+  tags:
+    - docker
+  only:
+    - master
+
+# Etapa de Publicação de Artefatos
+publish_artifacts:
+  stage: publish
+  image: mcr.microsoft.com/dotnet/core/sdk:5.0
+  script:
+    - echo "Publicando artefatos"
+    - dotnet publish --configuration Release --output ./output
+    - echo "Artefatos publicados em ./output"
+  artifacts:
+    paths:
+      - ./output
+  tags:
+    - docker
+  only:
+    - master
+
+# Etapa opcional: Deploy com Docker
+optional_deploy:
+  stage: optional_deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Criando imagem Docker"
+    - docker build -t jellyfin:latest .
+    - echo "Deploy da imagem"
+    - docker push your-repo/jellyfin:latest
+  tags:
+    - docker
+  only:
+    - master

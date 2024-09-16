@@ -1,0 +1,44 @@
+name: Tests
+on:
+  push:
+    branches:
+      - master
+  # Run tests against the forked branch, but
+  # do not allow access to secrets
+  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflows-in-forked-repositories
+  pull_request:
+
+env:
+  SDK_VERSION: "8.0.x"
+
+jobs:
+  run-tests:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+
+    runs-on: "${{ matrix.os }}"
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - uses: actions/setup-dotnet@6bd8b7f7774af54e05809fcc5431931b3eb1ddee # v4.0.1
+        with:
+          dotnet-version: ${{ env.SDK_VERSION }}
+
+      - name: Run DotNet CLI Tests
+        run: >
+          dotnet test Jellyfin.sln
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --settings tests/coverletArgs.runsettings
+          --verbosity minimal
+
+      - name: Merge code coverage results
+        uses: danielpalme/ReportGenerator-GitHub-Action@e3af7259842d9c814021ea121f85526e0872b25f # v5.3.9
+        with:
+          reports: "**/coverage.cobertura.xml"
+          targetdir: "merged/"
+          reporttypes: "Cobertura"
+
+      # TODO - which action / tool to use to publish code coverage results?
+      # - name: Publish code coverage results
