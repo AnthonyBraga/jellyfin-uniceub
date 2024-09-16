@@ -3,81 +3,72 @@ name: Jellyfin CI/CD Pipeline
 on:
   push:
     branches:
-      - main  # Executar o workflow em pushes para a branch "main"
+      - main
+  pull_request:
+    branches:
+      - main
 
-stages:
-  - setup
-  - build
-  - test
-  - sonarqube
-  - publish
+jobs:
+  setup_environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '5.0.x'
+      - run: dotnet --version
 
-# Etapa de Setup do Ambiente (.NET Core)
-setup_environment:
-  stage: setup
-  image: mcr.microsoft.com/dotnet/core/sdk:5.0
-  script:
-    - echo "Configurando ambiente .NET"
-    - dotnet --version
+  build_project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build the project
+        run: dotnet build --no-restore --configuration Release
 
-# Etapa de Build do Projeto
-build_project:
-  stage: build
-  image: mcr.microsoft.com/dotnet/core/sdk:5.0
-  script:
-    - echo "Restaurando dependências"
-    - dotnet restore
-    - echo "Buildando o projeto"
-    - dotnet build --no-restore --configuration Release
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: dotnet test --no-restore --verbosity normal
 
-# Etapa de Testes Automatizados
-run_tests:
-  stage: test
-  image: mcr.microsoft.com/dotnet/core/sdk:5.0
-  script:
-    - echo "Executando testes"
-    - dotnet test --no-restore --verbosity normal
+  merge_coverage_results:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.1.10
+      - name: Merge coverage results
+        run: reportgenerator "-reports:**/coverage.cobertura.xml" "-targetdir:merged/" "-reporttypes:Cobertura"
+    artifacts:
+      paths:
+        - merged/
+      expire_in: 1 week
 
-# Job para merge dos resultados de cobertura de código
-merge_coverage_results:
-  stage: test
-  image: mcr.microsoft.com/dotnet/core/sdk:7.0
-  script:
-    - echo "Merging coverage results"
-    - dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.1.10
-    - reportgenerator "-reports:**/coverage.cobertura.xml" "-targetdir:merged/" "-reporttypes:Cobertura"
-  artifacts:
-    paths:
-      - merged/
-    expire_in: 1 week
-  only:
-    - master
+  sonarqube_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run SonarQube scan
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=my-project-key \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.login=$SONAR_TOKEN \
+            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
 
-# Job de análise do SonarQube
-sonarqube_scan:
-  stage: sonarqube
-  image: sonarsource/sonar-scanner-cli:latest
-  dependencies:
-    - merge_coverage_results
-  script:
-    - echo "Running SonarQube scan"
-    - sonar-scanner \
-        -Dsonar.projectKey=my-project-key \
-        -Dsonar.sources=. \
-        -Dsonar.host.url=$SONAR_HOST_URL \
-        -Dsonar.login=$SONAR_TOKEN \
-        -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
-  only:
-    - main
-
-# Etapa de Publicação de Artefatos
-publish_artifacts:
-  stage: publish
-  image: mcr.microsoft.com/dotnet/core/sdk:5.0
-  script:
-    - echo "Publicando artefatos"
-    - dotnet publish --configuration Release --output ./output
-    - echo "Artefatos publicados em ./output"
-  artifacts:
-    paths:
-      - ./output
+  publish_artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Publish artifacts
+        run: |
+          dotnet publish --configuration Release --output ./output
+          echo "Artifacts published in ./output"
+    artifacts:
+      paths:
+        - ./output
