@@ -10,7 +10,7 @@ on:
 
 jobs:
   setup_environment:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     steps:
       - uses: actions/checkout@v3
       - name: Set up .NET
@@ -20,7 +20,7 @@ jobs:
       - run: dotnet --version
 
   build_project:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     steps:
       - uses: actions/checkout@v3
       - name: Restore dependencies
@@ -29,19 +29,19 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
   run_tests:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     steps:
       - uses: actions/checkout@v3
       - name: Run tests
-        run: dotnet test --no-restore --verbosity normal
+        run: dotnet test --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx"
       - name: Upload Test Results
         uses: actions/upload-artifact@v3
         with:
           name: test-results
-          path: /tests
+          path: '**/TestResults/*.trx'  # Ajuste o caminho conforme a localização real dos resultados dos testes
 
   merge_coverage_results:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     needs: run_tests
     steps:
       - uses: actions/checkout@v3
@@ -60,7 +60,7 @@ jobs:
           path: merged/
 
   sonarqube_scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     needs: merge_coverage_results
     steps:
       - uses: actions/checkout@v3
@@ -74,7 +74,7 @@ jobs:
             -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
 
   publish_artifacts:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, my-runner-tag]
     needs: [build_project, merge_coverage_results]
     steps:
       - uses: actions/checkout@v3
