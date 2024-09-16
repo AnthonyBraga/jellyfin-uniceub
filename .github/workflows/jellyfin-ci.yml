@@ -1,17 +1,16 @@
+name: Jellyfin CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main  # Executar o workflow em pushes para a branch "main"
+
 stages:
-  - checkout
   - setup
   - build
   - test
+  - sonarqube
   - publish
-
-# Etapa de Checkout do código
-checkout:
-  stage: checkout
-  script:
-    - echo "Clonando repositório"
-  only:
-    - master
 
 # Etapa de Setup do Ambiente (.NET Core)
 setup_environment:
@@ -20,8 +19,6 @@ setup_environment:
   script:
     - echo "Configurando ambiente .NET"
     - dotnet --version
-  only:
-    - master
 
 # Etapa de Build do Projeto
 build_project:
@@ -32,8 +29,6 @@ build_project:
     - dotnet restore
     - echo "Buildando o projeto"
     - dotnet build --no-restore --configuration Release
-  only:
-    - master
 
 # Etapa de Testes Automatizados
 run_tests:
@@ -42,8 +37,38 @@ run_tests:
   script:
     - echo "Executando testes"
     - dotnet test --no-restore --verbosity normal
+
+# Job para merge dos resultados de cobertura de código
+merge_coverage_results:
+  stage: test
+  image: mcr.microsoft.com/dotnet/core/sdk:7.0
+  script:
+    - echo "Merging coverage results"
+    - dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.1.10
+    - reportgenerator "-reports:**/coverage.cobertura.xml" "-targetdir:merged/" "-reporttypes:Cobertura"
+  artifacts:
+    paths:
+      - merged/
+    expire_in: 1 week
   only:
     - master
+
+# Job de análise do SonarQube
+sonarqube_scan:
+  stage: sonarqube
+  image: sonarsource/sonar-scanner-cli:latest
+  dependencies:
+    - merge_coverage_results
+  script:
+    - echo "Running SonarQube scan"
+    - sonar-scanner \
+        -Dsonar.projectKey=my-project-key \
+        -Dsonar.sources=. \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+  only:
+    - main
 
 # Etapa de Publicação de Artefatos
 publish_artifacts:
@@ -56,5 +81,3 @@ publish_artifacts:
   artifacts:
     paths:
       - ./output
-  only:
-    - master
