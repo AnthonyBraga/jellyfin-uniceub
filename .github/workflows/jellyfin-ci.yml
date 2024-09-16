@@ -21,6 +21,7 @@ jobs:
 
   build_project:
     runs-on: ubuntu-latest
+    needs: setup_environment
     steps:
       - uses: actions/checkout@v3
       - name: Restore dependencies
@@ -30,6 +31,7 @@ jobs:
 
   run_tests:
     runs-on: ubuntu-latest
+    needs: build_project
     steps:
       - uses: actions/checkout@v3
       - name: Run tests
